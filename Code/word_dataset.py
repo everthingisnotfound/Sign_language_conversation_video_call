@@ -14,7 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent
 RAW_GESTURE_DIR = BASE_DIR / "gestures"
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
 SEQUENCE_LENGTH = 30
-LANDMARK_DIM = 63
+RAW_LANDMARK_DIM = 63
+LANDMARK_DIM = 132
 
 ALL_SEQUENCES_PATH = BASE_DIR / "all_sequences.pkl"
 ALL_LABELS_PATH = BASE_DIR / "all_labels.pkl"
@@ -102,29 +103,119 @@ def save_json(data, path: Path) -> None:
 def create_hands_detector():
     return mp.solutions.hands.Hands(
         static_image_mode=False,
-        model_complexity=0,
+        model_complexity=1,
         max_num_hands=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
+        min_detection_confidence=0.35,
+        min_tracking_confidence=0.35,
     )
+
+
+def extract_raw_landmarks(hand_landmarks) -> np.ndarray:
+    return np.array(
+        [[landmark.x, landmark.y, landmark.z] for landmark in hand_landmarks.landmark],
+        dtype=np.float32,
+    ).reshape(-1)
+
+
+def _reshape_landmarks(flat_landmarks: np.ndarray) -> np.ndarray:
+    return np.asarray(flat_landmarks, dtype=np.float32).reshape(-1, 21, 3)
+
+
+def _compute_reference_scale(coords: np.ndarray, valid_mask: np.ndarray) -> float:
+    scales: list[float] = []
+    for frame, is_valid in zip(coords, valid_mask, strict=False):
+        if not is_valid:
+            continue
+
+        centered = frame - frame[0]
+        spread = float(np.max(np.linalg.norm(centered[:, :2], axis=1)))
+        if spread > 1e-6:
+            scales.append(spread)
+
+    if not scales:
+        return 1.0
+
+    scale = float(np.median(scales))
+    return scale if scale > 1e-6 else 1.0
+
+
+def normalize_flat_landmarks(flat_landmarks: np.ndarray) -> np.ndarray:
+    coords = _reshape_landmarks(flat_landmarks)[0]
+    centered = coords - coords[0]
+    scale = float(np.max(np.linalg.norm(centered[:, :2], axis=1)))
+    if scale < 1e-6:
+        scale = float(np.max(np.abs(centered)))
+    if scale < 1e-6:
+        scale = 1.0
+    return (centered / scale).reshape(-1)
 
 
 def normalize_landmarks(hand_landmarks) -> np.ndarray:
-    coords = np.array(
-        [[landmark.x, landmark.y, landmark.z] for landmark in hand_landmarks.landmark],
-        dtype=np.float32,
-    )
-    wrist = coords[0].copy()
-    coords -= wrist
+    return normalize_flat_landmarks(extract_raw_landmarks(hand_landmarks))
 
-    spread = np.max(np.linalg.norm(coords[:, :2], axis=1))
-    if spread < 1e-6:
-        spread = float(np.max(np.abs(coords)))
-    if spread < 1e-6:
-        spread = 1.0
 
-    coords /= spread
-    return coords.reshape(-1)
+def smooth_landmark_sequence(sequence: np.ndarray, window_size: int = 3) -> np.ndarray:
+    values = np.asarray(sequence, dtype=np.float32)
+    if len(values) < 3 or window_size <= 1:
+        return values
+
+    pad = window_size // 2
+    padded = np.pad(values, ((pad, pad), (0, 0)), mode="edge")
+    smoothed = np.empty_like(values)
+    for index in range(len(values)):
+        smoothed[index] = padded[index : index + window_size].mean(axis=0)
+    return smoothed
+
+
+def transform_landmark_sequence(sequence: np.ndarray) -> np.ndarray:
+    raw_sequence = np.asarray(sequence, dtype=np.float32).reshape(-1, RAW_LANDMARK_DIM)
+    frame_count = len(raw_sequence)
+    if frame_count == 0:
+        return np.zeros((0, LANDMARK_DIM), dtype=np.float32)
+
+    coords = raw_sequence.reshape(frame_count, 21, 3)
+    valid_mask = np.any(np.abs(coords) > 1e-6, axis=(1, 2))
+    if not np.any(valid_mask):
+        return np.zeros((frame_count, LANDMARK_DIM), dtype=np.float32)
+
+    reference_scale = _compute_reference_scale(coords, valid_mask)
+    first_valid_index = int(np.argmax(valid_mask))
+    reference_wrist = coords[first_valid_index, 0].copy()
+
+    features = np.zeros((frame_count, LANDMARK_DIM), dtype=np.float32)
+    previous_shape: np.ndarray | None = None
+    previous_motion: np.ndarray | None = None
+
+    for index, frame in enumerate(coords):
+        if not valid_mask[index]:
+            if previous_shape is None or previous_motion is None:
+                continue
+
+            features[index, :RAW_LANDMARK_DIM] = previous_shape
+            features[index, RAW_LANDMARK_DIM : RAW_LANDMARK_DIM + 3] = previous_motion
+            continue
+
+        wrist = frame[0].copy()
+        centered = (frame - wrist) / reference_scale
+        wrist_motion = (wrist - reference_wrist) / reference_scale
+        shape = centered.reshape(-1)
+
+        if previous_shape is None:
+            shape_delta = np.zeros_like(shape)
+            motion_delta = np.zeros_like(wrist_motion)
+        else:
+            shape_delta = shape - previous_shape
+            motion_delta = wrist_motion - previous_motion
+
+        feature_vector = np.concatenate(
+            [shape, wrist_motion, shape_delta, motion_delta],
+            axis=0,
+        )
+        features[index] = feature_vector.astype(np.float32)
+        previous_shape = shape
+        previous_motion = wrist_motion
+
+    return features
 
 
 def sample_frame_indices(frame_count: int, sequence_length: int = SEQUENCE_LENGTH) -> list[int]:
@@ -135,11 +226,35 @@ def sample_frame_indices(frame_count: int, sequence_length: int = SEQUENCE_LENGT
     return [int(round(index)) for index in indices]
 
 
+def _fill_missing_landmarks(raw_landmarks: list[np.ndarray | None]) -> np.ndarray | None:
+    first_valid = next((entry for entry in raw_landmarks if entry is not None), None)
+    if first_valid is None:
+        return None
+
+    filled: list[np.ndarray] = []
+    previous = np.asarray(first_valid, dtype=np.float32)
+    seen_valid = False
+
+    for entry in raw_landmarks:
+        if entry is None:
+            filled.append(previous.copy())
+            continue
+
+        previous = np.asarray(entry, dtype=np.float32)
+        seen_valid = True
+        filled.append(previous.copy())
+
+    if not seen_valid:
+        return None
+
+    return smooth_landmark_sequence(np.array(filled, dtype=np.float32))
+
+
 def extract_landmark_sequence(
     video_path: Path,
     hands=None,
     sequence_length: int = SEQUENCE_LENGTH,
-    min_detection_ratio: float = 0.25,
+    min_detection_ratio: float = 0.18,
 ):
     owns_detector = hands is None
     if hands is None:
@@ -154,9 +269,8 @@ def extract_landmark_sequence(
     frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_indices = sample_frame_indices(frame_count, sequence_length)
 
-    sequence = []
+    sequence_landmarks: list[np.ndarray | None] = []
     detections = 0
-    previous_landmarks = np.zeros(LANDMARK_DIM, dtype=np.float32)
 
     for frame_index in frame_indices:
         if frame_count > 0:
@@ -164,16 +278,16 @@ def extract_landmark_sequence(
 
         ok, frame = capture.read()
         if not ok:
-            sequence.append(previous_landmarks.copy())
+            sequence_landmarks.append(None)
             continue
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = hands.process(rgb_frame)
         if result.multi_hand_landmarks:
-            previous_landmarks = normalize_landmarks(result.multi_hand_landmarks[0])
+            sequence_landmarks.append(extract_raw_landmarks(result.multi_hand_landmarks[0]))
             detections += 1
-
-        sequence.append(previous_landmarks.copy())
+        else:
+            sequence_landmarks.append(None)
 
     capture.release()
     if owns_detector:
@@ -183,7 +297,11 @@ def extract_landmark_sequence(
     if detection_ratio < min_detection_ratio:
         return None, detection_ratio
 
-    return np.array(sequence, dtype=np.float32), detection_ratio
+    filled_sequence = _fill_missing_landmarks(sequence_landmarks)
+    if filled_sequence is None:
+        return None, detection_ratio
+
+    return filled_sequence, detection_ratio
 
 
 def read_representative_frame(video_path: Path) -> np.ndarray | None:

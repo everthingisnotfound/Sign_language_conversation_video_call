@@ -1,8 +1,9 @@
 {
   "class_count": 46,
   "video_count": 410,
-  "usable_sequences": 397,
-  "skipped_videos": 13,
+  "usable_sequences": 410,
+  "skipped_videos": 0,
   "sequence_length": 30,
-  "landmark_dim": 63
+  "raw_landmark_dim": 63,
+  "model_landmark_dim": 132
 }

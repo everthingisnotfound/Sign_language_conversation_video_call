@@ -8,6 +8,8 @@ from word_dataset import (
     ALL_SEQUENCES_PATH,
     DATASET_METADATA_PATH,
     LABEL_NAMES_PATH,
+    LANDMARK_DIM,
+    RAW_LANDMARK_DIM,
     SEQUENCE_LENGTH,
     create_hands_detector,
     extract_landmark_sequence,
@@ -82,7 +84,8 @@ def build_landmark_dataset(force: bool = True) -> dict[str, object]:
         "usable_sequences": len(sequences),
         "skipped_videos": skipped,
         "sequence_length": SEQUENCE_LENGTH,
-        "landmark_dim": 63,
+        "raw_landmark_dim": RAW_LANDMARK_DIM,
+        "model_landmark_dim": LANDMARK_DIM,
     }
     save_json(metadata, DATASET_METADATA_PATH)
 

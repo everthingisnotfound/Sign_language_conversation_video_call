@@ -14,6 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sign_language_core import LiveRecognitionSession, SignLanguageInterpreter
 
+WEB_MIN_CONFIDENCE = 0.15
+WEB_MIN_FRAMES = 6
+WEB_STABLE_FRAMES = 2
+WEB_COOLDOWN_SECONDS = 0.65
+
 
 def _allowed_origins() -> list[str]:
     configured = os.getenv(
@@ -23,7 +28,7 @@ def _allowed_origins() -> list[str]:
     return [origin.strip() for origin in configured.split(",") if origin.strip()]
 
 
-interpreter = SignLanguageInterpreter(min_confidence=0.25)
+interpreter = SignLanguageInterpreter(min_confidence=WEB_MIN_CONFIDENCE)
 sessions: dict[str, LiveRecognitionSession] = {}
 
 
@@ -79,7 +84,12 @@ def decode_image(image_payload: str) -> np.ndarray:
 def get_session(session_id: str) -> LiveRecognitionSession:
     session = sessions.get(session_id)
     if session is None:
-        session = interpreter.create_session(min_frames=8, transcript_threshold=0.25)
+        session = interpreter.create_session(
+            min_frames=WEB_MIN_FRAMES,
+            transcript_threshold=WEB_MIN_CONFIDENCE,
+            stable_frames=WEB_STABLE_FRAMES,
+            cooldown_seconds=WEB_COOLDOWN_SECONDS,
+        )
         sessions[session_id] = session
     return session
 
@@ -92,6 +102,9 @@ def health() -> dict[str, object]:
         "modelPath": str(interpreter.model_path),
         "mode": "word-sequence",
         "sequenceLength": 30,
+        "minConfidence": WEB_MIN_CONFIDENCE,
+        "minFrames": WEB_MIN_FRAMES,
+        "stableFrames": WEB_STABLE_FRAMES,
     }
 
 

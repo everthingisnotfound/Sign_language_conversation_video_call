@@ -2,6 +2,21 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Home.css";
 
+const highlights = [
+  {
+    title: "Live sign captions",
+    description: "Run word-level interpretation beside your call and watch the transcript build in real time.",
+  },
+  {
+    title: "Private local pipeline",
+    description: "Your browser preview talks to your own Python API, so you stay in control while testing.",
+  },
+  {
+    title: "Built for accessibility demos",
+    description: "A clearer UI, larger captions, and a calmer call layout help the experience feel presentation-ready.",
+  },
+];
+
 export default function Home() {
   const [roomId, setRoomId] = useState("");
   const [name, setName] = useState("");
@@ -16,36 +31,72 @@ export default function Home() {
 
   return (
     <div className="home">
-      <div className="overlay" />
+      <div className="home-ambient home-ambient--one" />
+      <div className="home-ambient home-ambient--two" />
 
-      <div className="card">
-        <h1 className="title">Sign-Bridge</h1>
+      <section className="home-copy">
+        <p className="hero-kicker">Accessible Communication Platform</p>
+        <h1 className="title">SignBridge</h1>
         <p className="subtitle">
-          Bridging communication through vision and voice.
+          Pair your video calls with live sign-to-text captions in a more polished, presentation-ready interface.
         </p>
 
-        <div className="input-group">
-          <input
-            type="text"
-            placeholder="Enter Your Name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-
-          <input
-            type="text"
-            placeholder="Enter Room ID"
-            value={roomId}
-            onChange={(event) => setRoomId(event.target.value)}
-          />
-
-          <button onClick={joinRoom}>Join Call</button>
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <strong>46</strong>
+            <span>Word gestures trained</span>
+          </div>
+          <div className="hero-stat">
+            <strong>Live</strong>
+            <span>Python API + React call view</span>
+          </div>
         </div>
 
-        <p className="hint">
-          Tip: Share your Room ID with others to connect
-        </p>
-      </div>
+        <div className="feature-grid">
+          {highlights.map((item) => (
+            <article key={item.title} className="feature-card">
+              <h2>{item.title}</h2>
+              <p>{item.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="join-card">
+        <div className="join-card__header">
+          <p className="hero-kicker">Join a room</p>
+          <h2>Start your accessible video call</h2>
+          <p>Enter your display name and room code to open the call and interpreter workspace.</p>
+        </div>
+
+        <div className="input-group">
+          <label>
+            <span>Your name</span>
+            <input
+              type="text"
+              placeholder="Aarav"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Room ID</span>
+            <input
+              type="text"
+              placeholder="team-sync-01"
+              value={roomId}
+              onChange={(event) => setRoomId(event.target.value)}
+            />
+          </label>
+
+          <button type="button" onClick={joinRoom}>
+            Launch Call Workspace
+          </button>
+        </div>
+
+        <p className="hint">Tip: run your Python API before opening the interpreter inside the room.</p>
+      </section>
     </div>
   );
 }

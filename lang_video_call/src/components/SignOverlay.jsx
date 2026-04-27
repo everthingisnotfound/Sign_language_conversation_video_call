@@ -9,7 +9,7 @@ export default function SignOverlay() {
         const res = await fetch("http://localhost:5000/predict");
         const data = await res.json();
         setText(data.text);
-      } catch (err) {
+      } catch {
         console.log("API not running");
       }
     }, 1000);

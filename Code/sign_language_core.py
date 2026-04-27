@@ -14,7 +14,15 @@ import numpy as np
 import pyttsx3
 from tensorflow.keras.models import load_model
 
-from word_dataset import LANDMARK_DIM, SEQUENCE_LENGTH, create_hands_detector, load_label_names, normalize_landmarks
+from word_dataset import (
+    LANDMARK_DIM,
+    RAW_LANDMARK_DIM,
+    SEQUENCE_LENGTH,
+    create_hands_detector,
+    extract_raw_landmarks,
+    load_label_names,
+    transform_landmark_sequence,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,8 +32,11 @@ DEFAULT_MODEL_CANDIDATES = [
     BASE_DIR / "sign_language_model.keras",
     BASE_DIR / "sign_language_model.h5",
 ]
-DEFAULT_MIN_CONFIDENCE = 0.30
+DEFAULT_MIN_CONFIDENCE = 0.15
 DEFAULT_MIN_FRAMES = 8
+DEFAULT_TRANSCRIPT_THRESHOLD = 0.15
+DEFAULT_STABLE_FRAMES = 3
+DEFAULT_COOLDOWN_SECONDS = 0.8
 
 
 @dataclass
@@ -52,9 +63,9 @@ class TranscriptSnapshot:
 class TranscriptBuilder:
     def __init__(
         self,
-        stable_frames: int = 4,
-        confidence_threshold: float = 0.35,
-        cooldown_seconds: float = 1.0,
+        stable_frames: int = DEFAULT_STABLE_FRAMES,
+        confidence_threshold: float = DEFAULT_TRANSCRIPT_THRESHOLD,
+        cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
     ) -> None:
         self.stable_frames = stable_frames
         self.confidence_threshold = confidence_threshold
@@ -165,7 +176,7 @@ class LiveRecognitionSession:
         feature_vector = (
             np.asarray(landmarks, dtype=np.float32)
             if landmarks is not None
-            else np.zeros(LANDMARK_DIM, dtype=np.float32)
+            else np.zeros(RAW_LANDMARK_DIM, dtype=np.float32)
         )
 
         self.sequence_buffer.append(feature_vector)
@@ -177,13 +188,13 @@ class LiveRecognitionSession:
         if not self.sequence_buffer:
             return np.zeros((1, self.sequence_length, LANDMARK_DIM), dtype=np.float32)
 
-        sequence = np.stack(list(self.sequence_buffer), axis=0)
+        sequence = np.stack(list(self.sequence_buffer), axis=0).astype(np.float32)
         if len(sequence) == self.sequence_length:
-            return sequence[np.newaxis, ...]
+            return transform_landmark_sequence(sequence)[np.newaxis, ...]
 
         indices = np.linspace(0, len(sequence) - 1, num=self.sequence_length)
         resampled = sequence[np.round(indices).astype(int)]
-        return resampled[np.newaxis, ...]
+        return transform_landmark_sequence(resampled)[np.newaxis, ...]
 
 
 class SignLanguageInterpreter:
@@ -204,12 +215,18 @@ class SignLanguageInterpreter:
     def create_session(
         self,
         min_frames: int = DEFAULT_MIN_FRAMES,
-        transcript_threshold: float = 0.35,
+        transcript_threshold: float = DEFAULT_TRANSCRIPT_THRESHOLD,
+        stable_frames: int = DEFAULT_STABLE_FRAMES,
+        cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
     ) -> LiveRecognitionSession:
         return LiveRecognitionSession(
             sequence_length=SEQUENCE_LENGTH,
             min_frames=min_frames,
-            transcript_builder=TranscriptBuilder(confidence_threshold=transcript_threshold),
+            transcript_builder=TranscriptBuilder(
+                stable_frames=stable_frames,
+                confidence_threshold=transcript_threshold,
+                cooldown_seconds=cooldown_seconds,
+            ),
         )
 
     def _resolve_model_path(self, model_path: str | Path | None) -> Path:
@@ -292,7 +309,7 @@ class SignLanguageInterpreter:
 
         hand_landmarks = result.multi_hand_landmarks[0]
         bbox = self._landmarks_to_bbox(hand_landmarks.landmark, frame.shape)
-        return normalize_landmarks(hand_landmarks), bbox, True
+        return extract_raw_landmarks(hand_landmarks), bbox, True
 
     def _landmarks_to_bbox(
         self,

@@ -13,7 +13,7 @@ def main() -> None:
     build_train_test_split()
 
     print("\nStep 3/3: training the word-level sign model...")
-    train_model(epochs=25)
+    train_model()
 
     print("\nTraining pipeline complete.")
 

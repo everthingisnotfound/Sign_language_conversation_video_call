@@ -47,16 +47,8 @@ export default function VideoCall({ roomID, userName }) {
   }, [roomID, userName]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        position: "absolute",
-        inset: 0,
-        background: "#071018",
-      }}
-    />
+    <div className="video-stage">
+      <div ref={containerRef} className="video-stage__canvas" />
+    </div>
   );
 }
