@@ -1,42 +1,73 @@
-import cv2, os, random
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import cv2
 import numpy as np
 
-def get_image_size():
-	img = cv2.imread('gestures/0/100.jpg', 0)
-	return img.shape
-
-gestures = os.listdir('gestures/')
-gestures.sort(key = int)
-begin_index = 0
-end_index = 5
-image_x, image_y = get_image_size()
-
-if len(gestures)%5 != 0:
-	rows = int(len(gestures)/5)+1
-else:
-	rows = int(len(gestures)/5)
-
-full_img = None
-for i in range(rows):
-	col_img = None
-	for j in range(begin_index, end_index):
-		img_path = "gestures/%s/%d.jpg" % (j, random.randint(1, 1200))
-		img = cv2.imread(img_path, 0)
-		if np.any(img == None):
-			img = np.zeros((image_y, image_x), dtype = np.uint8)
-		if np.any(col_img == None):
-			col_img = img
-		else:
-			col_img = np.hstack((col_img, img))
-
-	begin_index += 5
-	end_index += 5
-	if np.any(full_img == None):
-		full_img = col_img
-	else:
-		full_img = np.vstack((full_img, col_img))
+from word_dataset import list_video_samples, read_representative_frame
 
 
-cv2.imshow("gestures", full_img)
-cv2.imwrite('full_img.jpg', full_img)
-cv2.waitKey(0)
+THUMBNAIL_WIDTH = 220
+THUMBNAIL_HEIGHT = 160
+COLUMNS = 4
+OUTPUT_FILE = Path(__file__).resolve().parent / "gesture_overview.jpg"
+
+
+def create_gesture_grid() -> np.ndarray:
+    samples_by_label = {}
+    for sample in list_video_samples():
+        samples_by_label.setdefault(sample.label, sample.path)
+
+    labels = sorted(samples_by_label.keys(), key=str.lower)
+    if not labels:
+        raise FileNotFoundError("No gesture videos were found to preview.")
+
+    rows = math.ceil(len(labels) / COLUMNS)
+    canvas = np.zeros(
+        (rows * THUMBNAIL_HEIGHT, COLUMNS * THUMBNAIL_WIDTH, 3),
+        dtype=np.uint8,
+    )
+
+    for index, label in enumerate(labels):
+        frame = read_representative_frame(samples_by_label[label])
+        if frame is None:
+            frame = np.zeros((THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, 3), dtype=np.uint8)
+        else:
+            frame = cv2.resize(frame, (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT))
+
+        cv2.rectangle(frame, (0, THUMBNAIL_HEIGHT - 28), (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT), (0, 0, 0), -1)
+        cv2.putText(
+            frame,
+            label[:20],
+            (8, THUMBNAIL_HEIGHT - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+
+        row = index // COLUMNS
+        column = index % COLUMNS
+        y1 = row * THUMBNAIL_HEIGHT
+        y2 = y1 + THUMBNAIL_HEIGHT
+        x1 = column * THUMBNAIL_WIDTH
+        x2 = x1 + THUMBNAIL_WIDTH
+        canvas[y1:y2, x1:x2] = frame
+
+    return canvas
+
+
+def main() -> None:
+    grid_image = create_gesture_grid()
+    cv2.imwrite(str(OUTPUT_FILE), grid_image)
+    print(f"Saved gesture preview to {OUTPUT_FILE.name}")
+    cv2.imshow("Gesture Overview", grid_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,59 +1,67 @@
-import cv2
-from glob import glob
+from __future__ import annotations
+
 import numpy as np
-import random
-from sklearn.utils import shuffle
-import pickle
-import os
+from sklearn.model_selection import train_test_split
 
-def pickle_images_labels():
-	images_labels = []
-	images = glob("gestures/*/*.jpg")
-	images.sort()
-	for image in images:
-		print(image)
-		label = image[image.find(os.sep)+1: image.rfind(os.sep)]
-		img = cv2.imread(image, 0)
-		images_labels.append((np.array(img, dtype=np.uint8), int(label)))
-	return images_labels
+from collect_landmark import build_landmark_dataset
+from word_dataset import (
+    ALL_LABELS_PATH,
+    ALL_SEQUENCES_PATH,
+    TEST_LABELS_PATH,
+    TEST_SEQUENCES_PATH,
+    TRAIN_LABELS_PATH,
+    TRAIN_SEQUENCES_PATH,
+    load_pickle,
+    save_pickle,
+)
 
-images_labels = pickle_images_labels()
-images_labels = shuffle(shuffle(shuffle(shuffle(images_labels))))
-images, labels = zip(*images_labels)
-print("Length of images_labels", len(images_labels))
 
-train_images = images[:int(5/6*len(images))]
-print("Length of train_images", len(train_images))
-with open("train_images", "wb") as f:
-	pickle.dump(train_images, f)
-del train_images
+TEST_SIZE = 0.2
+RANDOM_STATE = 42
 
-train_labels = labels[:int(5/6*len(labels))]
-print("Length of train_labels", len(train_labels))
-with open("train_labels", "wb") as f:
-	pickle.dump(train_labels, f)
-del train_labels
 
-test_images = images[int(5/6*len(images)):int(11/12*len(images))]
-print("Length of test_images", len(test_images))
-with open("test_images", "wb") as f:
-	pickle.dump(test_images, f)
-del test_images
+def build_train_test_split(
+    test_size: float = TEST_SIZE,
+    random_state: int = RANDOM_STATE,
+) -> dict[str, int]:
+    if not ALL_SEQUENCES_PATH.exists() or not ALL_LABELS_PATH.exists():
+        build_landmark_dataset(force=True)
 
-test_labels = labels[int(5/6*len(labels)):int(11/12*len(images))]
-print("Length of test_labels", len(test_labels))
-with open("test_labels", "wb") as f:
-	pickle.dump(test_labels, f)
-del test_labels
+    sequences = np.array(load_pickle(ALL_SEQUENCES_PATH), dtype=np.float32)
+    labels = np.array(load_pickle(ALL_LABELS_PATH), dtype=np.int32)
 
-val_images = images[int(11/12*len(images)):]
-print("Length of test_images", len(val_images))
-with open("val_images", "wb") as f:
-	pickle.dump(val_images, f)
-del val_images
+    if len(sequences) == 0:
+        raise RuntimeError("No landmark sequences were available to split.")
 
-val_labels = labels[int(11/12*len(labels)):]
-print("Length of val_labels", len(val_labels))
-with open("val_labels", "wb") as f:
-	pickle.dump(val_labels, f)
-del val_labels
+    train_sequences, test_sequences, train_labels, test_labels = train_test_split(
+        sequences,
+        labels,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=labels,
+    )
+
+    save_pickle(train_sequences, TRAIN_SEQUENCES_PATH)
+    save_pickle(test_sequences, TEST_SEQUENCES_PATH)
+    save_pickle(train_labels, TRAIN_LABELS_PATH)
+    save_pickle(test_labels, TEST_LABELS_PATH)
+
+    summary = {
+        "train_samples": int(len(train_sequences)),
+        "test_samples": int(len(test_sequences)),
+        "class_count": int(len(np.unique(labels))),
+    }
+
+    print(
+        f"Saved {summary['train_samples']} training samples and "
+        f"{summary['test_samples']} test samples."
+    )
+    return summary
+
+
+def main() -> None:
+    build_train_test_split()
+
+
+if __name__ == "__main__":
+    main()

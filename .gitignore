@@ -1,0 +1,30 @@
+# Python environment and caches
+Code/.venv/
+Code/__pycache__/
+Code/**/*.pyc
+Code/**/*.pyo
+Code/**/*.pyd
+
+# Generated training artifacts and intermediate datasets
+Code/all_sequences.pkl
+Code/all_labels.pkl
+Code/train_sequences.pkl
+Code/test_sequences.pkl
+Code/train_labels.pkl
+Code/test_labels.pkl
+Code/landmark_data.csv
+Code/training_history.json
+
+# Optional local-only dataset and backups
+Code/gestures/
+Code/old_cnn_backup/
+
+# React local dependencies and secrets
+lang_video_call/node_modules/
+lang_video_call/dist/
+lang_video_call/.env
+lang_video_call.zip
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

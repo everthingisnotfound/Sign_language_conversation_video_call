@@ -1,0 +1,138 @@
+/* BACKGROUND */
+.home {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: linear-gradient(135deg, #0f3d2e, #1f7a63, #0ea5e9);
+  font-family: "Poppins", sans-serif;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+/* SOFT MOVING GLOW */
+.home::before {
+  content: "";
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(34,197,94,0.3), transparent 70%);
+  top: -100px;
+  left: -100px;
+  filter: blur(100px);
+  animation: float 8s infinite ease-in-out;
+}
+
+.home::after {
+  content: "";
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(56,189,248,0.3), transparent 70%);
+  bottom: -100px;
+  right: -100px;
+  filter: blur(100px);
+  animation: float 10s infinite ease-in-out;
+}
+
+/* CARD */
+.card {
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 50px 40px;
+  border-radius: 20px;
+  text-align: center;
+  width: 380px;
+
+  backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.4);
+
+  animation: fadeIn 1s ease;
+}
+
+/* TITLE */
+.title {
+  font-size: 2.7rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+/* SUBTITLE */
+.subtitle {
+  font-size: 0.95rem;
+  color: #d1fae5;
+  margin-bottom: 30px;
+}
+
+/* INPUT GROUP */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* INPUT */
+.input-group input {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 1rem;
+  transition: 0.3s;
+}
+
+.input-group input:focus {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* BUTTON */
+.input-group button {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e, #38bdf8);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.input-group button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px #22c55e;
+}
+
+/* HINT */
+.hint {
+  margin-top: 20px;
+  font-size: 0.8rem;
+  color: #bbf7d0;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(30px);
+  }
+}

@@ -1,71 +1,73 @@
+from __future__ import annotations
+
 import cv2
-import numpy as np
-import pickle
-
-def build_squares(img):
-	x, y, w, h = 420, 140, 10, 10
-	d = 10
-	imgCrop = None
-	crop = None
-	for i in range(10):
-		for j in range(5):
-			if np.any(imgCrop == None):
-				imgCrop = img[y:y+h, x:x+w]
-			else:
-				imgCrop = np.hstack((imgCrop, img[y:y+h, x:x+w]))
-			#print(imgCrop.shape)
-			cv2.rectangle(img, (x,y), (x+w, y+h), (0,255,0), 1)
-			x+=w+d
-		if np.any(crop == None):
-			crop = imgCrop
-		else:
-			crop = np.vstack((crop, imgCrop)) 
-		imgCrop = None
-		x = 420
-		y+=h+d
-	return crop
-
-def get_hand_hist():
-	cam = cv2.VideoCapture(1)
-	if cam.read()[0]==False:
-		cam = cv2.VideoCapture(0)
-	x, y, w, h = 300, 100, 300, 300
-	flagPressedC, flagPressedS = False, False
-	imgCrop = None
-	while True:
-		img = cam.read()[1]
-		img = cv2.flip(img, 1)
-		img = cv2.resize(img, (640, 480))
-		hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		
-		keypress = cv2.waitKey(1)
-		if keypress == ord('c'):		
-			hsvCrop = cv2.cvtColor(imgCrop, cv2.COLOR_BGR2HSV)
-			flagPressedC = True
-			hist = cv2.calcHist([hsvCrop], [0, 1], None, [180, 256], [0, 180, 0, 256])
-			cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX)
-		elif keypress == ord('s'):
-			flagPressedS = True	
-			break
-		if flagPressedC:	
-			dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, 180, 0, 256], 1)
-			dst1 = dst.copy()
-			disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
-			cv2.filter2D(dst,-1,disc,dst)
-			blur = cv2.GaussianBlur(dst, (11,11), 0)
-			blur = cv2.medianBlur(blur, 15)
-			ret,thresh = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-			thresh = cv2.merge((thresh,thresh,thresh))
-			#cv2.imshow("res", res)
-			cv2.imshow("Thresh", thresh)
-		if not flagPressedS:
-			imgCrop = build_squares(img)
-		#cv2.rectangle(img, (x,y), (x+w, y+h), (0,255,0), 2)
-		cv2.imshow("Set hand histogram", img)
-	cam.release()
-	cv2.destroyAllWindows()
-	with open("hist", "wb") as f:
-		pickle.dump(hist, f)
+import mediapipe as mp
 
 
-get_hand_hist()
+def main() -> None:
+    print("The new word-level pipeline uses hand landmarks, not hist.pkl segmentation.")
+    print("This tool now acts as a webcam hand-detection preview. Press Q to quit.")
+
+    capture = cv2.VideoCapture(0)
+    if not capture.isOpened():
+        raise SystemExit("Unable to access the webcam.")
+
+    hands = mp.solutions.hands.Hands(
+        static_image_mode=False,
+        model_complexity=0,
+        max_num_hands=1,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+    drawing = mp.solutions.drawing_utils
+    connections = mp.solutions.hands.HAND_CONNECTIONS
+
+    try:
+        while True:
+            ok, frame = capture.read()
+            if not ok:
+                break
+
+            frame = cv2.flip(frame, 1)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            result = hands.process(rgb_frame)
+
+            if result.multi_hand_landmarks:
+                for hand_landmarks in result.multi_hand_landmarks:
+                    drawing.draw_landmarks(frame, hand_landmarks, connections)
+                status_text = "Hand detected"
+                status_color = (0, 255, 0)
+            else:
+                status_text = "Show your signing hand"
+                status_color = (0, 180, 255)
+
+            cv2.putText(
+                frame,
+                status_text,
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.9,
+                status_color,
+                2,
+            )
+            cv2.putText(
+                frame,
+                "Q: quit",
+                (20, frame.shape[0] - 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (200, 200, 200),
+                2,
+            )
+
+            cv2.imshow("Hand Detection Preview", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+    finally:
+        capture.release()
+        hands.close()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()

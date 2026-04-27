@@ -1,0 +1,7 @@
+.room-shell {
+  position: relative;
+  width: 100vw;
+  height: 100svh;
+  overflow: hidden;
+  background: #071018;
+}
