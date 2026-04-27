@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: signbridge-api
+    runtime: docker
+    dockerContext: ./Code
+    dockerfilePath: ./Code/Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SIGN_API_HOST
+        value: 0.0.0.0
+      - key: SIGN_API_PORT
+        value: 8000
+      - key: SIGN_API_ORIGINS
+        sync: false
