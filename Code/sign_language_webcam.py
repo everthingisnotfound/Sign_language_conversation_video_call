@@ -8,7 +8,11 @@ from sign_language_core import SignLanguageInterpreter, TextSpeaker
 def draw_status(frame, prediction, transcript_state):
     active_label = (
         prediction.label
-        or (prediction.top_predictions[0]["label"] if prediction.top_predictions else None)
+        or (
+            prediction.top_predictions[0]["label"]
+            if prediction.top_predictions
+            else None
+        )
         or transcript_state.candidate_label
         or "Waiting..."
     )
@@ -58,10 +62,13 @@ def draw_status(frame, prediction, transcript_state):
         2,
     )
 
-    top_text = " | ".join(
-        f"{item['label']}:{item['confidence']:.2f}"
-        for item in prediction.top_predictions[:3]
-    ) or "-"
+    top_text = (
+        " | ".join(
+            f"{item['label']}:{item['confidence']:.2f}"
+            for item in prediction.top_predictions[:3]
+        )
+        or "-"
+    )
     cv2.putText(
         frame,
         f"Top: {top_text}",
@@ -89,9 +96,13 @@ def draw_status(frame, prediction, transcript_state):
 
 def main() -> None:
     interpreter = SignLanguageInterpreter(min_confidence=0.15)
-    session = interpreter.create_session(min_frames=8, transcript_threshold=0.15)
+    session = interpreter.create_session(
+        min_frames=8,
+        transcript_threshold=0.15,
+        stable_frames=3,
+        cooldown_seconds=1.5,
+    )
     speaker = TextSpeaker()
-    
 
     camera = cv2.VideoCapture(0)
     if not camera.isOpened():
@@ -107,7 +118,9 @@ def main() -> None:
 
             frame = cv2.flip(frame, 1)
             prediction = interpreter.predict_from_frame(frame, session=session)
-            transcript_state = session.transcript_builder.update(prediction.label, prediction.confidence)
+            transcript_state = session.transcript_builder.update(
+                prediction.label, prediction.confidence
+            )
 
             draw_status(frame, prediction, transcript_state)
             cv2.imshow("Sign Language Interpreter", frame)

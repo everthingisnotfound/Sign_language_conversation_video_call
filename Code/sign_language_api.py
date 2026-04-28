@@ -16,8 +16,8 @@ from sign_language_core import LiveRecognitionSession, SignLanguageInterpreter
 
 WEB_MIN_CONFIDENCE = 0.15
 WEB_MIN_FRAMES = 6
-WEB_STABLE_FRAMES = 2
-WEB_COOLDOWN_SECONDS = 0.65
+WEB_STABLE_FRAMES = 3
+WEB_COOLDOWN_SECONDS = 1.2
 
 
 def _allowed_origins() -> list[str]:
@@ -73,7 +73,9 @@ def decode_image(image_payload: str) -> np.ndarray:
     try:
         binary = base64.b64decode(encoded)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid base64 image payload.") from exc
+        raise HTTPException(
+            status_code=400, detail="Invalid base64 image payload."
+        ) from exc
 
     image = cv2.imdecode(np.frombuffer(binary, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
@@ -131,7 +133,9 @@ def predict_frame(payload: FrameRequest) -> dict[str, object]:
         session=session,
         min_confidence=payload.min_confidence,
     )
-    transcript_state = session.transcript_builder.update(prediction.label, prediction.confidence)
+    transcript_state = session.transcript_builder.update(
+        prediction.label, prediction.confidence
+    )
 
     return {
         "sessionId": session_id,

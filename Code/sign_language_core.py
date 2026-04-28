@@ -75,6 +75,7 @@ class TranscriptBuilder:
         self.candidate_hits = 0
         self.last_committed_label: str | None = None
         self.last_commit_time = 0.0
+        self.has_reset_since_last_commit = True
 
     def clear(self) -> None:
         self.transcript = ""
@@ -82,6 +83,7 @@ class TranscriptBuilder:
         self.candidate_hits = 0
         self.last_committed_label = None
         self.last_commit_time = 0.0
+        self.has_reset_since_last_commit = True
 
     def update(self, label: str | None, confidence: float) -> TranscriptSnapshot:
         committed_label = None
@@ -90,6 +92,7 @@ class TranscriptBuilder:
         if not label or confidence < self.confidence_threshold:
             self.candidate_label = None
             self.candidate_hits = 0
+            self.has_reset_since_last_commit = True
             return TranscriptSnapshot(
                 transcript=self.transcript,
                 candidate_label=self.candidate_label,
@@ -103,15 +106,27 @@ class TranscriptBuilder:
         else:
             self.candidate_label = label
             self.candidate_hits = 1
+            if label != self.last_committed_label:
+                self.has_reset_since_last_commit = True
 
         enough_frames = self.candidate_hits >= self.stable_frames
-        cooldown_complete = (time.time() - self.last_commit_time) >= self.cooldown_seconds
+        cooldown_complete = (
+            time.time() - self.last_commit_time
+        ) >= self.cooldown_seconds
         is_new_label = label != self.last_committed_label
 
-        if enough_frames and (is_new_label or cooldown_complete):
+        can_commit = False
+        if enough_frames:
+            if is_new_label:
+                can_commit = True
+            elif cooldown_complete and self.has_reset_since_last_commit:
+                can_commit = True
+
+        if can_commit:
             self._append_label(label)
             self.last_committed_label = label
             self.last_commit_time = time.time()
+            self.has_reset_since_last_commit = False
             committed_label = label
             updated = True
 
@@ -237,7 +252,9 @@ class SignLanguageInterpreter:
             if candidate.exists():
                 return candidate
 
-        raise FileNotFoundError("No compatible word-level model file was found in the project directory.")
+        raise FileNotFoundError(
+            "No compatible word-level model file was found in the project directory."
+        )
 
     def predict_from_frame(
         self,
