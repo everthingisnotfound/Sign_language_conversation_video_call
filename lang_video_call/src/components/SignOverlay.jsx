@@ -1,21 +1,5 @@
-import { useEffect, useState } from "react";
-
-export default function SignOverlay() {
-  const [text, setText] = useState("...");
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("http://localhost:5000/predict");
-        const data = await res.json();
-        setText(data.text);
-      } catch {
-        console.log("API not running");
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
+export default function SignOverlay({ text = "" }) {
+  if (!text) return null;
 
   return (
     <div
@@ -30,6 +14,8 @@ export default function SignOverlay() {
         color: "white",
         fontSize: "18px",
         fontWeight: "600",
+        zIndex: 10,
+        pointerEvents: "none",
       }}
     >
       ✋ {text}
