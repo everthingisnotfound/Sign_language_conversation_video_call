@@ -38,7 +38,11 @@ function pickPreferredVoice(voices) {
   );
 }
 
-export default function SignInterpreterPanel({ userName, onInterpreterStateChange }) {
+export default function SignInterpreterPanel({
+  userName,
+  onInterpreterStateChange,
+  onCommittedCaption,
+}) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -46,6 +50,7 @@ export default function SignInterpreterPanel({ userName, onInterpreterStateChang
   const requestInFlightRef = useRef(false);
   const sessionIdRef = useRef("");
   const runningRef = useRef(false);
+  const onCommittedCaptionRef = useRef(onCommittedCaption);
 
   const [isRunning, setIsRunning] = useState(false);
   const [status, setStatus] = useState("Ready to start");
@@ -125,6 +130,10 @@ export default function SignInterpreterPanel({ userName, onInterpreterStateChang
     requestInFlightRef.current = false;
     sessionIdRef.current = "";
   }
+
+  useEffect(() => {
+    onCommittedCaptionRef.current = onCommittedCaption;
+  }, [onCommittedCaption]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !speechSupported) {
@@ -366,6 +375,14 @@ export default function SignInterpreterPanel({ userName, onInterpreterStateChang
       setReady(Boolean(data.ready));
       setFramesBuffered(data.framesBuffered || 0);
       setDetectionRatio(data.detectionRatio || 0);
+
+      if (data.updated && data.committedLabel) {
+        onCommittedCaptionRef.current?.(
+          data.transcript || "",
+          data.committedLabel,
+          data.confidence ?? 0,
+        );
+      }
 
       if (!data.hasHand) {
         setStatus("Show your signing hand in the frame");

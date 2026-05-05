@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import SignInterpreterPanel from "../components/SignInterpreterPanel";
 import VideoCall from "../components/VideoCall";
@@ -24,11 +24,21 @@ export default function Room() {
   const query = new URLSearchParams(useLocation().search);
   const name = query.get("name") || "Guest";
 
+  const videoCallRef = useRef(null);
   const [interpreterState, setInterpreterState] = useState(
     initialInterpreterState,
   );
+  const [remoteCaption, setRemoteCaption] = useState(null);
 
   const roomId = decodeURIComponent(id || "");
+
+  const handleRemoteCaption = useCallback((payload) => {
+    setRemoteCaption(payload);
+  }, []);
+
+  const handleCommittedCaption = useCallback((fullTranscript, word, confidence) => {
+    videoCallRef.current?.sendTranscript(fullTranscript, word, confidence);
+  }, []);
 
   const activeLabel =
     interpreterState.currentLabel ||
@@ -46,7 +56,12 @@ export default function Room() {
     <div className="room-shell">
       <div className="room-backdrop" />
 
-      <VideoCall roomID={roomId} userName={name} />
+      <VideoCall
+        ref={videoCallRef}
+        roomID={roomId}
+        userName={name}
+        onRemoteCaption={handleRemoteCaption}
+      />
 
       <div className="room-hud">
         <div className="room-brand">
@@ -85,10 +100,13 @@ export default function Room() {
       <SignInterpreterPanel
         userName={name}
         onInterpreterStateChange={setInterpreterState}
+        onCommittedCaption={handleCommittedCaption}
       />
 
       <div
-        className={`caption-dock ${interpreterState.isRunning ? "active" : ""}`}
+        className={`caption-dock ${
+          interpreterState.isRunning || remoteCaption ? "active" : ""
+        }`}
       >
         <div className="caption-dock__meta">
           <span
@@ -102,6 +120,17 @@ export default function Room() {
           <span>{interpreterState.status}</span>
           <span>{activeLabel}</span>
         </div>
+
+        {remoteCaption ? (
+          <div className="caption-dock__remote">
+            <span className="caption-dock__remote-eyebrow">
+              Live from {remoteCaption.fromUserName}
+            </span>
+            <p className="caption-dock__text caption-dock__text--remote">
+              {remoteCaption.transcript}
+            </p>
+          </div>
+        ) : null}
 
         <p className="caption-dock__text">{transcriptText}</p>
       </div>

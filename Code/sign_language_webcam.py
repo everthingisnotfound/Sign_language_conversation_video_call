@@ -119,7 +119,9 @@ def main() -> None:
             frame = cv2.flip(frame, 1)
             prediction = interpreter.predict_from_frame(frame, session=session)
             transcript_state = session.transcript_builder.update(
-                prediction.label, prediction.confidence
+                prediction.label,
+                prediction.confidence,
+                prediction.has_hand,
             )
 
             draw_status(frame, prediction, transcript_state)

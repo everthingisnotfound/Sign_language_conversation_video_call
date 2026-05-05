@@ -238,6 +238,30 @@
   color: #f7fcff;
 }
 
+.caption-dock__remote {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(131, 240, 220, 0.28);
+}
+
+.caption-dock__remote-eyebrow {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(186, 244, 220, 0.85);
+}
+
+.caption-dock__text--remote {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.85vw, 1.28rem);
+  color: #f0fff8;
+}
+
 @media (max-width: 1100px) {
   .room-brand {
     width: min(420px, calc(100vw - 48px));

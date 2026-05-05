@@ -37,6 +37,7 @@ DEFAULT_MIN_FRAMES = 8
 DEFAULT_TRANSCRIPT_THRESHOLD = 0.15
 DEFAULT_STABLE_FRAMES = 3
 DEFAULT_COOLDOWN_SECONDS = 0.8
+DEFAULT_HAND_ABSENT_MIN_SECONDS = 0.42
 
 
 @dataclass
@@ -66,16 +67,19 @@ class TranscriptBuilder:
         stable_frames: int = DEFAULT_STABLE_FRAMES,
         confidence_threshold: float = DEFAULT_TRANSCRIPT_THRESHOLD,
         cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
+        hand_absent_min_seconds: float = DEFAULT_HAND_ABSENT_MIN_SECONDS,
     ) -> None:
         self.stable_frames = stable_frames
         self.confidence_threshold = confidence_threshold
         self.cooldown_seconds = cooldown_seconds
+        self.hand_absent_min_seconds = hand_absent_min_seconds
         self.transcript = ""
         self.candidate_label: str | None = None
         self.candidate_hits = 0
         self.last_committed_label: str | None = None
         self.last_commit_time = 0.0
         self.has_reset_since_last_commit = True
+        self._hand_absent_since: float | None = None
 
     def clear(self) -> None:
         self.transcript = ""
@@ -84,12 +88,37 @@ class TranscriptBuilder:
         self.last_committed_label = None
         self.last_commit_time = 0.0
         self.has_reset_since_last_commit = True
+        self._hand_absent_since = None
 
-    def update(self, label: str | None, confidence: float) -> TranscriptSnapshot:
+    def update(
+        self,
+        label: str | None,
+        confidence: float,
+        has_hand: bool = True,
+    ) -> TranscriptSnapshot:
         committed_label = None
         updated = False
+        now = time.time()
 
-        if not label or confidence < self.confidence_threshold:
+        if not has_hand:
+            if self._hand_absent_since is None:
+                self._hand_absent_since = now
+            if (now - self._hand_absent_since) < self.hand_absent_min_seconds:
+                return TranscriptSnapshot(
+                    transcript=self.transcript,
+                    candidate_label=self.candidate_label,
+                    committed_label=committed_label,
+                    candidate_hits=self.candidate_hits,
+                    updated=updated,
+                )
+        else:
+            self._hand_absent_since = None
+
+        if (
+            not has_hand
+            or not label
+            or confidence < self.confidence_threshold
+        ):
             self.candidate_label = None
             self.candidate_hits = 0
             self.has_reset_since_last_commit = True
@@ -146,6 +175,8 @@ class TranscriptBuilder:
         if self.transcript:
             self.transcript += " "
         self.transcript += token
+        self.candidate_label = None
+        self.candidate_hits = 0
 
 
 class LiveRecognitionSession:
@@ -233,6 +264,7 @@ class SignLanguageInterpreter:
         transcript_threshold: float = DEFAULT_TRANSCRIPT_THRESHOLD,
         stable_frames: int = DEFAULT_STABLE_FRAMES,
         cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
+        hand_absent_min_seconds: float = DEFAULT_HAND_ABSENT_MIN_SECONDS,
     ) -> LiveRecognitionSession:
         return LiveRecognitionSession(
             sequence_length=SEQUENCE_LENGTH,
@@ -241,6 +273,7 @@ class SignLanguageInterpreter:
                 stable_frames=stable_frames,
                 confidence_threshold=transcript_threshold,
                 cooldown_seconds=cooldown_seconds,
+                hand_absent_min_seconds=hand_absent_min_seconds,
             ),
         )
 

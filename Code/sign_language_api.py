@@ -17,7 +17,8 @@ from sign_language_core import LiveRecognitionSession, SignLanguageInterpreter
 WEB_MIN_CONFIDENCE = 0.15
 WEB_MIN_FRAMES = 6
 WEB_STABLE_FRAMES = 3
-WEB_COOLDOWN_SECONDS = 1.2
+WEB_COOLDOWN_SECONDS = 1.45
+WEB_HAND_ABSENT_MIN_SECONDS = 0.45
 
 
 def _allowed_origins() -> list[str]:
@@ -91,6 +92,7 @@ def get_session(session_id: str) -> LiveRecognitionSession:
             transcript_threshold=WEB_MIN_CONFIDENCE,
             stable_frames=WEB_STABLE_FRAMES,
             cooldown_seconds=WEB_COOLDOWN_SECONDS,
+            hand_absent_min_seconds=WEB_HAND_ABSENT_MIN_SECONDS,
         )
         sessions[session_id] = session
     return session
@@ -107,6 +109,7 @@ def health() -> dict[str, object]:
         "minConfidence": WEB_MIN_CONFIDENCE,
         "minFrames": WEB_MIN_FRAMES,
         "stableFrames": WEB_STABLE_FRAMES,
+        "handAbsentMinSeconds": WEB_HAND_ABSENT_MIN_SECONDS,
     }
 
 
@@ -133,8 +136,14 @@ def predict_frame(payload: FrameRequest) -> dict[str, object]:
         session=session,
         min_confidence=payload.min_confidence,
     )
+    label_for_transcript = prediction.label if prediction.has_hand else None
+    confidence_for_transcript = (
+        prediction.confidence if prediction.has_hand else 0.0
+    )
     transcript_state = session.transcript_builder.update(
-        prediction.label, prediction.confidence
+        label_for_transcript,
+        confidence_for_transcript,
+        prediction.has_hand,
     )
 
     return {
