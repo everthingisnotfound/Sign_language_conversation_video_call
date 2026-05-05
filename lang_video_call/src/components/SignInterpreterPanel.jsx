@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import "./SignInterpreterPanel.css";
 
-const API_BASE_URL = import.meta.env.VITE_SIGN_API_URL || "http://127.0.0.1:8000";
+const _rawApiBase =
+  import.meta.env.VITE_SIGN_API_URL?.replace(/\/+$/, "") || "http://127.0.0.1:8000";
+const API_BASE_URL = _rawApiBase;
 const API_MIN_CONFIDENCE = 0.15;
 const CAPTURE_INTERVAL_MS = 250;
 const MODEL_SEQUENCE_LENGTH = 30;

@@ -29,6 +29,17 @@ def _allowed_origins() -> list[str]:
     return [origin.strip() for origin in configured.split(",") if origin.strip()]
 
 
+def _cors_origin_regex() -> str | None:
+    """Allow browser calls from any Vercel preview/production *.vercel.app host."""
+    raw = os.getenv("SIGN_API_ORIGIN_REGEX")
+    if raw is not None:
+        stripped = raw.strip()
+        if not stripped or stripped.lower() in ("0", "false", "none"):
+            return None
+        return stripped
+    return r"https://.*\.vercel\.app"
+
+
 interpreter = SignLanguageInterpreter(min_confidence=WEB_MIN_CONFIDENCE)
 sessions: dict[str, LiveRecognitionSession] = {}
 
@@ -45,9 +56,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_regex = _cors_origin_regex()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins(),
+    allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
