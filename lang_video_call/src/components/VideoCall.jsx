@@ -1,8 +1,17 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { ZegoUIKitPrebuilt } from "@zegocloud/zego-uikit-prebuilt";
 
-export default function VideoCall({ roomID, userName }) {
+const VideoCall = forwardRef(({ roomID, userName }, ref) => {
   const containerRef = useRef(null);
+  const zegoRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    sendTranscript: (text, label, confidence) => {
+      if (zegoRef.current && zegoRef.current.sendTranscript) {
+        zegoRef.current.sendTranscript(text, label, confidence);
+      }
+    },
+  }));
 
   useEffect(() => {
     const appID = Number(import.meta.env.VITE_ZEGO_APP_ID);
@@ -10,7 +19,8 @@ export default function VideoCall({ roomID, userName }) {
     const containerElement = containerRef.current;
 
     if (!containerElement || !appID || !serverSecret) {
-      return undefined;
+      console.error("Missing ZEGO config");
+      return;
     }
 
     const userID = Date.now().toString();
@@ -21,7 +31,7 @@ export default function VideoCall({ roomID, userName }) {
       serverSecret,
       roomID,
       userID,
-      finalUserName
+      finalUserName,
     );
 
     const zp = ZegoUIKitPrebuilt.create(kitToken);
@@ -37,11 +47,14 @@ export default function VideoCall({ roomID, userName }) {
       turnOnMicrophoneWhenJoining: true,
     });
 
+    zegoRef.current = zp;
+
     return () => {
       try {
         zp.destroy();
-      } catch {
-        containerElement.innerHTML = "";
+      } catch (err) {
+        console.warn("Zego destroy failed:", err);
+        if (containerElement) containerElement.innerHTML = "";
       }
     };
   }, [roomID, userName]);
@@ -51,4 +64,6 @@ export default function VideoCall({ roomID, userName }) {
       <div ref={containerRef} className="video-stage__canvas" />
     </div>
   );
-}
+});
+
+export default VideoCall;

@@ -23,16 +23,19 @@ export default function Room() {
   const { id } = useParams();
   const query = new URLSearchParams(useLocation().search);
   const name = query.get("name") || "Guest";
+
   const [interpreterState, setInterpreterState] = useState(
     initialInterpreterState,
   );
 
   const roomId = decodeURIComponent(id || "");
+
   const activeLabel =
     interpreterState.currentLabel ||
     interpreterState.candidateLabel ||
     interpreterState.lastCommittedLabel ||
     "Waiting for sign";
+
   const transcriptText =
     interpreterState.transcript ||
     (interpreterState.isRunning
@@ -49,6 +52,7 @@ export default function Room() {
         <div className="room-brand">
           <p className="room-kicker">SignBridge Live</p>
           <h1>Room {roomId}</h1>
+
           <div className="room-meta">
             <span>{name}</span>
             <span>
@@ -64,6 +68,7 @@ export default function Room() {
             <span className="room-stat-label">Current sign</span>
             <strong>{activeLabel}</strong>
           </div>
+
           <div className="room-stat-card">
             <span className="room-stat-label">Confidence</span>
             <strong>
@@ -87,13 +92,17 @@ export default function Room() {
       >
         <div className="caption-dock__meta">
           <span
-            className={`caption-pill ${interpreterState.hasHand ? "active" : ""}`}
+            className={`caption-pill ${
+              interpreterState.hasHand ? "active" : ""
+            }`}
           >
             {interpreterState.hasHand ? "Hand tracked" : "Waiting for hand"}
           </span>
+
           <span>{interpreterState.status}</span>
           <span>{activeLabel}</span>
         </div>
+
         <p className="caption-dock__text">{transcriptText}</p>
       </div>
     </div>
