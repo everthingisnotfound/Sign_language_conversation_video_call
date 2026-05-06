@@ -101,8 +101,11 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
         if (!Array.isArray(commands) || !commands.length) return;
         for (const cmd of commands) {
           // Zego's custom command structure varies slightly across versions.
-          const fromUser = cmd?.fromUser;
           const payload = cmd?.command;
+          const fromUser = cmd?.fromUser || {
+            userID: cmd?.senderUserID,
+            userName: payload?.fromUserName,
+          };
           emitRemoteCaption(fromUser, payload);
         }
       },

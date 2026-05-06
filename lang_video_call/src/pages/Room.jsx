@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SignInterpreterPanel from "../components/SignInterpreterPanel";
 import VideoCall from "../components/VideoCall";
@@ -23,8 +23,11 @@ export default function Room() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const query = new URLSearchParams(location.search);
-  const name = query.get("name") || "Guest";
+  const providedName = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    return (query.get("name") || "").trim();
+  }, [location.search]);
+  const name = providedName || "Guest";
 
   const videoCallRef = useRef(null);
   const [interpreterState, setInterpreterState] = useState(
@@ -37,11 +40,10 @@ export default function Room() {
   // If someone opens a shared /room/:id link without providing a name,
   // send them to the join page with the room id prefilled.
   useEffect(() => {
-    const providedName = (query.get("name") || "").trim();
     if (!providedName) {
       navigate(`/?room=${encodeURIComponent(roomId)}`, { replace: true });
     }
-  }, [navigate, roomId, location.search]);
+  }, [navigate, roomId, providedName]);
 
   const handleRemoteCaption = useCallback((payload) => {
     setRemoteCaption(payload);

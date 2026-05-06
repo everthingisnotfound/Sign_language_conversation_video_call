@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ParticleBackground from "../components/ParticleBackground";
 import "./Home.css";
@@ -32,18 +32,14 @@ export default function Home() {
     return (params.get("room") || "").trim();
   }, [location.search]);
 
-  useEffect(() => {
-    if (sharedRoomId) {
-      setRoomId(sharedRoomId);
-    }
-  }, [sharedRoomId]);
+  const effectiveRoomId = sharedRoomId || roomId;
 
   const joinRoom = () => {
-    if (!roomId.trim()) return alert("Enter Room ID");
+    if (!effectiveRoomId.trim()) return alert("Enter Room ID");
     if (!name.trim()) return alert("Enter your name");
 
     navigate(
-      `/room/${encodeURIComponent(roomId.trim())}?name=${encodeURIComponent(name.trim())}`,
+      `/room/${encodeURIComponent(effectiveRoomId.trim())}?name=${encodeURIComponent(name.trim())}`,
     );
   };
 
@@ -108,7 +104,7 @@ export default function Home() {
             <input
               type="text"
               placeholder="team-sync-01"
-              value={roomId}
+              value={effectiveRoomId}
               onChange={(event) => setRoomId(event.target.value)}
               readOnly={Boolean(sharedRoomId)}
             />
