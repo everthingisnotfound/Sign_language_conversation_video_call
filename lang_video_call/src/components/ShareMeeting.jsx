@@ -5,7 +5,8 @@ export default function ShareMeeting({ roomId }) {
   const [copied, setCopied] = useState(false);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const cleanUrl = `${baseUrl}/room/${encodeURIComponent(roomId)}`;
+  // Share the join experience: room id prefilled, user enters only their name.
+  const cleanUrl = `${baseUrl}/?room=${encodeURIComponent(roomId)}`;
 
   const message = `Join my SignBridge room: ${roomId}`;
 

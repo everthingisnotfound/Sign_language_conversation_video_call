@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import ParticleBackground from "../components/ParticleBackground";
 import "./Home.css";
 
@@ -25,6 +25,18 @@ export default function Home() {
   const [roomId, setRoomId] = useState("");
   const [name, setName] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const sharedRoomId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get("room") || "").trim();
+  }, [location.search]);
+
+  useEffect(() => {
+    if (sharedRoomId) {
+      setRoomId(sharedRoomId);
+    }
+  }, [sharedRoomId]);
 
   const joinRoom = () => {
     if (!roomId.trim()) return alert("Enter Room ID");
@@ -98,6 +110,7 @@ export default function Home() {
               placeholder="team-sync-01"
               value={roomId}
               onChange={(event) => setRoomId(event.target.value)}
+              readOnly={Boolean(sharedRoomId)}
             />
           </label>
 
