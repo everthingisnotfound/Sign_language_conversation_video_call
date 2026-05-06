@@ -21,7 +21,7 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
   useImperativeHandle(ref, () => ({
     sendTranscript: (text, label, confidence) => {
       const zp = zegoRef.current;
-      if (!zp?.sendInRoomCommand) {
+      if (!zp) {
         return;
       }
       const payload = {
@@ -32,7 +32,15 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
         confidence: confidence ?? 0,
         fromUserName: userNameRef.current || "Guest",
       };
-      void zp.sendInRoomCommand(JSON.stringify(payload), []);
+      // Prefer custom command broadcast (more reliable than sendInRoomCommand([], ...)).
+      if (typeof zp.sendInRoomCustomCommand === "function") {
+        void zp.sendInRoomCustomCommand(payload);
+        return;
+      }
+      if (typeof zp.sendInRoomCommand === "function") {
+        // Some SDK builds treat [] as "send to nobody"; try undefined broadcast.
+        void zp.sendInRoomCommand(JSON.stringify(payload), undefined);
+      }
     },
   }));
 
@@ -60,6 +68,23 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
 
     const zp = ZegoUIKitPrebuilt.create(kitToken);
 
+    const emitRemoteCaption = (fromUser, payload) => {
+      if (!fromUser || fromUser.userID === localUserIdRef.current) {
+        return;
+      }
+      if (payload?.type !== SIGNBRIDGE_CMD || payload.transcript == null) {
+        return;
+      }
+      onRemoteCaptionRef.current?.({
+        fromUserId: fromUser.userID,
+        fromUserName: fromUser.userName || payload.fromUserName || "Guest",
+        transcript: String(payload.transcript),
+        label: payload.label != null ? String(payload.label) : "",
+        confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
+        at: Date.now(),
+      });
+    };
+
     zp.joinRoom({
       container: containerElement,
       scenario: {
@@ -72,23 +97,19 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
       layout: "Grid",
       turnOnCameraWhenJoining: true,
       turnOnMicrophoneWhenJoining: true,
-      onInRoomCommandReceived: (fromUser, command) => {
-        if (!fromUser || fromUser.userID === localUserIdRef.current) {
-          return;
+      onInRoomCustomCommandReceived: (commands) => {
+        if (!Array.isArray(commands) || !commands.length) return;
+        for (const cmd of commands) {
+          // Zego's custom command structure varies slightly across versions.
+          const fromUser = cmd?.fromUser;
+          const payload = cmd?.command;
+          emitRemoteCaption(fromUser, payload);
         }
+      },
+      onInRoomCommandReceived: (fromUser, command) => {
         try {
           const payload = JSON.parse(command);
-          if (payload?.type !== SIGNBRIDGE_CMD || payload.transcript == null) {
-            return;
-          }
-          onRemoteCaptionRef.current?.({
-            fromUserId: fromUser.userID,
-            fromUserName: fromUser.userName || payload.fromUserName || "Guest",
-            transcript: String(payload.transcript),
-            label: payload.label != null ? String(payload.label) : "",
-            confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
-            at: Date.now(),
-          });
+          emitRemoteCaption(fromUser, payload);
         } catch {
           /* ignore malformed commands */
         }
