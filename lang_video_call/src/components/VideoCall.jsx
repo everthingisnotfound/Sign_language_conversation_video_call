@@ -9,6 +9,7 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
   const localUserIdRef = useRef("");
   const onRemoteCaptionRef = useRef(onRemoteCaption);
   const userNameRef = useRef(userName || "Guest");
+  const sendSeqRef = useRef(0);
 
   useEffect(() => {
     onRemoteCaptionRef.current = onRemoteCaption;
@@ -24,13 +25,18 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
       if (!zp) {
         return;
       }
+      // Keep payload tiny so it always fits signaling limits.
+      const clippedTranscript = String(text ?? "").slice(-180);
+      const token = String(label ?? "").trim();
       const payload = {
         v: 1,
         type: SIGNBRIDGE_CMD,
-        transcript: text ?? "",
-        label: label ?? "",
+        transcript: clippedTranscript,
+        token,
+        label: token,
         confidence: confidence ?? 0,
         fromUserName: userNameRef.current || "Guest",
+        seq: (sendSeqRef.current += 1),
       };
       // Prefer custom command broadcast (more reliable than sendInRoomCommand([], ...)).
       if (typeof zp.sendInRoomCustomCommand === "function") {
@@ -72,13 +78,22 @@ const VideoCall = forwardRef(({ roomID, userName, onRemoteCaption }, ref) => {
       if (!fromUser || fromUser.userID === localUserIdRef.current) {
         return;
       }
-      if (payload?.type !== SIGNBRIDGE_CMD || payload.transcript == null) {
+      if (payload?.type !== SIGNBRIDGE_CMD) {
         return;
       }
+      const transcript =
+        payload.transcript != null
+          ? String(payload.transcript)
+          : payload.token != null
+            ? String(payload.token)
+            : payload.label != null
+              ? String(payload.label)
+              : "";
+      if (!transcript) return;
       onRemoteCaptionRef.current?.({
         fromUserId: fromUser.userID,
         fromUserName: fromUser.userName || payload.fromUserName || "Guest",
-        transcript: String(payload.transcript),
+        transcript,
         label: payload.label != null ? String(payload.label) : "",
         confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
         at: Date.now(),
